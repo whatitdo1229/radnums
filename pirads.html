@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PI-RADS v2.1 Reporting Tool</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="form-container">
+        <h1>PI-RADS v2.1 Prostate MRI Reporting Tool</h1>
+        <form id="piradsForm">
+            <!-- Peripheral Zone (PZ) Assessment -->
+            <div class="section">
+                <h2>Peripheral Zone (PZ) Findings</h2>
+                <label for="pz_t2">T2-Weighted Imaging (T2WI):</label>
+                <select id="pz_t2" name="pz_t2">
+                    <option value="0">Not applicable (Transition Zone)</option>
+                    <option value="1">Score 1: Normal</option>
+                    <option value="2">Score 2: Low suspicion</option>
+                    <option value="3">Score 3: Intermediate</option>
+                    <option value="4">Score 4: High suspicion</option>
+                    <option value="5">Score 5: Very high suspicion</option>
+                </select>
+
+                <label for="pz_dwi">Diffusion-Weighted Imaging (DWI):</label>
+                <select id="pz_dwi" name="pz_dwi">
+                    <option value="1">Score 1: Normal</option>
+                    <option value="2">Score 2: Low suspicion</option>
+                    <option value="3">Score 3: Intermediate</option>
+                    <option value="4">Score 4: High suspicion</option>
+                    <option value="5">Score 5: Very high suspicion</option>
+                </select>
+
+                <label for="pz_dce">Dynamic Contrast-Enhanced (DCE):</label>
+                <select id="pz_dce" name="pz_dce">
+                    <option value="negative">Negative</option>
+                    <option value="positive">Positive</option>
+                </select>
+            </div>
+
+            <!-- Transition Zone (TZ) Assessment -->
+            <div class="section">
+                <h2>Transition Zone (TZ) Findings</h2>
+                <label for="tz_t2">T2-Weighted Imaging (T2WI):</label>
+                <select id="tz_t2" name="tz_t2">
+                    <option value="1">Score 1: Normal</option>
+                    <option value="2">Score 2: Low suspicion</option>
+                    <option value="3">Score 3: Intermediate</option>
+                    <option value="4">Score 4: High suspicion</option>
+                    <option value="5">Score 5: Very high suspicion</option>
+                </select>
+
+                <label for="tz_dwi">Diffusion-Weighted Imaging (DWI):</label>
+                <select id="tz_dwi" name="tz_dwi">
+                    <option value="0">Not applicable</option>
+                    <option value="1">Score 1: Normal</option>
+                    <option value="2">Score 2: Low suspicion</option>
+                    <option value="3">Score 3: Intermediate</option>
+                    <option value="4">Score 4: High suspicion</option>
+                    <option value="5">Score 5: Very high suspicion</option>
+                </select>
+            </div>
+
+            <!-- Lesion Details -->
+            <div class="section">
+                <h2>Lesion Details</h2>
+                <label for="lesion_location">Lesion Location:</label>
+                <select id="lesion_location" name="lesion_location">
+                    <option value="peripheral">Peripheral Zone</option>
+                    <option value="transition">Transition Zone</option>
+                    <option value="both">Both Zones</option>
+                </select>
+
+                <label for="lesion_size">Lesion Size (mm):</label>
+                <input type="number" id="lesion_size" name="lesion_size" min="0" step="1">
+
+                <label for="ece">Extraprostatic Extension (ECE):</label>
+                <input type="checkbox" id="ece" name="ece"> Suspected ECE
+            </div>
+
+            <!-- Submit Button -->
+            <button type="button" class="button" onclick="calculatePIRADS()">Calculate PI-RADS Score</button>
+        </form>
+
+        <!-- Results Section -->
+        <div class="result" id="result" style="display: none;">
+            <h2>PI-RADS Assessment</h2>
+            <p><strong>PI-RADS Score:</strong> <span id="pirads_score"></span></p>
+            <p><strong>Recommendation:</strong> <span id="recommendation"></span></p>
+            <p><strong>Lesion Details:</strong> <span id="lesion_details"></span></p>
+        </div>
+    </div>
+
+    <script>
+        function calculatePIRADS() {
+            // Get form values
+            const pz_t2 = parseInt(document.getElementById('pz_t2').value);
+            const pz_dwi = parseInt(document.getElementById('pz_dwi').value);
+            const pz_dce = document.getElementById('pz_dce').value;
+            const tz_t2 = parseInt(document.getElementById('tz_t2').value);
+            const tz_dwi = parseInt(document.getElementById('tz_dwi').value);
+            const lesion_location = document.getElementById('lesion_location').value;
+            const lesion_size = parseInt(document.getElementById('lesion_size').value) || 0;
+            const ece = document.getElementById('ece').checked;
+
+            let pirads_score = 0;
+            let recommendation = '';
+
+            // PI-RADS v2.1 Logic
+            if (lesion_location === 'peripheral' || lesion_location === 'both') {
+                pirads_score = pz_dwi;
+                if (pz_dwi === 3 && pz_dce === 'positive') {
+                    pirads_score = 4; // Upgrade PZ score of 3 to 4 if DCE is positive
+                }
+            }
+            if (lesion_location === 'transition' || lesion_location === 'both') {
+                pirads_score = tz_t2;
+                if (tz_t2 === 3 && tz_dwi >= 4) {
+                    pirads_score = 4; // Upgrade TZ score of 3 to 4 if DWI >= 4
+                } else if (tz_t2 === 3 && tz_dwi === 5) {
+                    pirads_score = 5; // Upgrade to 5 if DWI is 5
+                }
+            }
+
+            // Recommendations based on PI-RADS score
+            if (pirads_score === 1 || pirads_score === 2) {
+                recommendation = 'Low risk of clinically significant cancer. Follow-up as per clinical guidelines.';
+            } else if (pirads_score === 3) {
+                recommendation = 'Intermediate risk. Consider follow-up MRI or biopsy based on clinical factors (e.g., PSA, DRE).';
+            } else if (pirads_score === 4 || pirads_score === 5) {
+                recommendation = 'High risk of clinically significant cancer. Biopsy recommended.';
+            }
+
+            // Adjust recommendation for ECE or lesion size
+            if (ece) {
+                recommendation += ' Suspected extraprostatic extension noted; urgent biopsy and further staging recommended.';
+            }
+            if (lesion_size >= 15) {
+                recommendation += ' Lesion size ≥15 mm, increasing likelihood of clinically significant cancer.';
+            }
+
+            // Apply success or warning class to result div
+            const resultDiv = document.getElementById('result');
+            resultDiv.className = 'result'; // Reset classes
+            if (pirads_score === 1 || pirads_score === 2) {
+                resultDiv.classList.add('success');
+            } else if (pirads_score >= 3) {
+                resultDiv.classList.add('warning');
+            }
+
+            // Display results
+            document.getElementById('pirads_score').textContent = pirads_score || 'N/A';
+            document.getElementById('recommendation').textContent = recommendation;
+            document.getElementById('lesion_details').textContent = `Location: ${lesion_location}, Size: ${lesion_size} mm, ECE: ${ece ? 'Yes' : 'No'}`;
+            resultDiv.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
