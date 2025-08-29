@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lung Nodule Classifier (Based on Lung-RADS v1.1)</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 20px auto; padding: 20px; background: #f9f9f9; }
+        h1 { text-align: center; }
+        form { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        label { display: block; margin-top: 10px; font-weight: bold; }
+        input, select { width: 100%; padding: 8px; margin-top: 5px; box-sizing: border-box; }
+        button { margin-top: 20px; padding: 10px; background: #007bff; color: white; border: none; cursor: pointer; width: 100%; }
+        #output { margin-top: 20px; padding: 15px; background: #e9ecef; border-radius: 8px; white-space: pre-wrap; }
+        .caveat { color: #dc3545; font-style: italic; }
+    </style>
+</head>
+<body>
+    <h1>Lung Nodule Classifier</h1>
+    <p>This tool provides a user-friendly way to classify lung nodules based on ACR Lung-RADS v1.1 guidelines, primarily for low-dose CT lung cancer screening exams. It guides you through key characteristics step-by-step. For non-screening or atypical cases, consult full guidelines or a specialist. This is for educational/routine use only—not a substitute for clinical judgment.</p>
+    
+    <form id="noduleForm">
+        <label for="screeningType">Screening Type:</label>
+        <select id="screeningType" required>
+            <option value="">Select...</option>
+            <option value="baseline">Baseline (First Screening)</option>
+            <option value="annual">Annual/Follow-up Screening</option>
+        </select>
+        
+        <label for="noduleType">Nodule Type:</label>
+        <select id="noduleType" required>
+            <option value="">Select...</option>
+            <option value="solid">Solid</option>
+            <option value="part-solid">Part-Solid</option>
+            <option value="non-solid">Non-Solid (Ground-Glass)</option>
+            <option value="endobronchial">Endobronchial</option>
+            <option value="perifissural">Perifissural (Benign-Appearing)</option>
+            <option value="other">Other/Atypical (e.g., Cystic, Calcified)</option>
+        </select>
+        
+        <label for="size">Average Diameter (mm): <span class="caveat">(For part-solid, measure solid component separately if needed)</span></label>
+        <input type="number" id="size" min="0" step="0.1" required>
+        
+        <label for="solidComponentSize">Solid Component Size (mm, for Part-Solid only):</label>
+        <input type="number" id="solidComponentSize" min="0" step="0.1" disabled>
+        
+        <label>Additional Features: <span class="caveat">(Select if present; may upgrade category)</span></label>
+        <input type="checkbox" id="spiculation" value="spiculation"> Spiculation<br>
+        <input type="checkbox" id="upperLobe" value="upperLobe"> Upper Lobe Location<br>
+        <input type="checkbox" id="growth" value="growth"> Growth on Prior Scan (for annual)<br>
+        <input type="checkbox" id="multipleNodules" value="multipleNodules"> Multiple Nodules (focus on most suspicious)<br>
+        
+        <label for="priorCategory">Prior Lung-RADS Category (for annual screening):</label>
+        <select id="priorCategory" disabled>
+            <option value="">N/A</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4A">4A</option>
+            <option value="4B">4B</option>
+            <option value="4X">4X</option>
+        </select>
+        
+        <label>Significant Other Findings (S Modifier):</label>
+        <input type="checkbox" id="sModifier" value="sModifier"> Yes (e.g., emphysema, aneurysm, infection)
+        
+        <label>Prior Lung Cancer History (C Modifier):</label>
+        <input type="checkbox" id="cModifier" value="cModifier"> Yes
+        
+        <label for="notes">Additional Notes/Overrides:</label>
+        <textarea id="notes" rows="3"></textarea>
+        
+        <button type="submit">Calculate Lung-RADS</button>
+    </form>
+    
+    <div id="output"></div>
+
+    <script>
+        const form = document.getElementById('noduleForm');
+        const output = document.getElementById('output');
+        const screeningType = document.getElementById('screeningType');
+        const noduleType = document.getElementById('noduleType');
+        const sizeInput = document.getElementById('size');
+        const solidComponentSize = document.getElementById('solidComponentSize');
+        const priorCategory = document.getElementById('priorCategory');
+        const growthCheckbox = document.getElementById('growth');
+
+        // Dynamic field enabling
+        screeningType.addEventListener('change', () => {
+            const isAnnual = screeningType.value === 'annual';
+            priorCategory.disabled = !isAnnual;
+            growthCheckbox.disabled = !isAnnual;
+        });
+
+        noduleType.addEventListener('change', () => {
+            solidComponentSize.disabled = noduleType.value !== 'part-solid';
+        });
+
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const screening = screeningType.value;
+            const type = noduleType.value;
+            const size = parseFloat(sizeInput.value);
+            const solidSize = parseFloat(solidComponentSize.value) || 0;
+            const hasSpiculation = document.getElementById('spiculation').checked;
+            const hasUpperLobe = document.getElementById('upperLobe').checked;
+            const hasGrowth = document.getElementById('growth').checked && screening === 'annual';
+            const hasMultiple = document.getElementById('multipleNodules').checked;
+            const prior = priorCategory.value;
+            const sMod = document.getElementById('sModifier').checked ? 'S' : '';
+            const cMod = document.getElementById('cModifier').checked ? 'C' : '';
+            const notes = document.getElementById('notes').value;
+
+            let category = '0'; // Default incomplete
+            let recs = 'Incomplete evaluation. Provide more details.';
+            let caveats = 'Caveats: This applies to classic low-dose CT screening cases. For edge cases (e.g., atypical features, non-screening CT, or comorbidities), consult ACR guidelines or specialist. Always use clinical judgment.';
+
+            if (type === 'other') {
+                category = 'Other';
+                recs = 'Atypical nodule; management per clinical context (e.g., benign calcified = 1, cystic may need follow-up).';
+            } else if (type === 'perifissural') {
+                category = '2';
+                recs = 'Benign appearance/behavior. Continue annual screening.';
+            } else if (type === 'endobronchial') {
+                category = '4A';
+                recs = 'Suspicious. 3-month LDCT; PET/CT or tissue sampling if persists.';
+            } else {
+                // Main logic for solid, part-solid, non-solid
+                let effectiveSize = size;
+                if (type === 'part-solid') effectiveSize = Math.max(size, solidSize); // Use larger of total or solid component
+
+                if (screening === 'baseline') {
+                    if (type === 'solid') {
+                        if (size < 6) category = '2';
+                        else if (size < 8) category = '3';
+                        else category = '4A';
+                    } else if (type === 'part-solid') {
+                        if (size < 6) category = '2';
+                        else if (solidSize < 6) category = '3';
+                        else if (solidSize < 8) category = '4A';
+                        else category = '4B';
+                    } else if (type === 'non-solid') {
+                        if (size < 20) category = '2';
+                        else category = '3';
+                    }
+                } else if (screening === 'annual') {
+                    // For annual, consider stability/growth
+                    if (!hasGrowth) {
+                        // Stable or new small
+                        if (type === 'solid' && size < 6) category = '2';
+                        else if (type === 'solid' && size < 8) category = '3';
+                        else if (type === 'part-solid' && solidSize < 6) category = '3';
+                        else category = '4A'; // Defaults, adjust
+                    } else {
+                        // Growth: upgrade
+                        category = '4A'; // Or higher based on rate, but simplify
+                        if (type === 'solid' && size >= 8) category = '4B';
+                    }
+                }
+
+                // Upgrades for additional features
+                if (hasSpiculation || hasUpperLobe) category = '4X'; // Suspicious features
+
+                // Recommendations based on category
+                switch (category) {
+                    case '2': recs = 'Benign appearance/behavior. Continue annual LDCT screening.'; break;
+                    case '3': recs = 'Probably benign. 6-month LDCT.'; break;
+                    case '4A': recs = 'Suspicious. 3-month LDCT; PET/CT for nodules >8mm.'; break;
+                    case '4B': recs = 'Very suspicious. PET/CT and/or tissue sampling.'; break;
+                    case '4X': recs = 'Suspicious, additional features. PET/CT and/or tissue sampling.'; break;
+                }
+            }
+
+            // Modifiers
+            if (cMod) recs += ' Note: Prior lung cancer history (C modifier) may alter management.';
+            if (sMod) recs += ' Significant incidental findings (S modifier) require separate follow-up.';
+
+            // Handle multiple nodules caveat
+            if (hasMultiple) caveats += ' For multiple nodules, classify based on the most suspicious one.';
+
+            // Generate report snippet
+            const report = `FINDINGS: ${type.charAt(0).toUpperCase() + type.slice(1)} lung nodule measuring ${size} mm${type === 'part-solid' ? ` (solid component ${solidSize} mm)` : ''}. ${hasSpiculation ? 'Spiculated. ' : ''}${hasUpperLobe ? 'Upper lobe location. ' : ''}${hasGrowth ? 'Interval growth noted. ' : ''}
+IMPRESSION: Lung-RADS ${category}${cMod}${sMod} - ${recs}
+${notes ? `Notes: ${notes}\n` : ''}${caveats}`;
+
+            output.textContent = report;
+        });
+    </script>
+</body>
+</html>
