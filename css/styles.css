@@ -1,0 +1,99 @@
+/* Global resets and variables */
+:root {
+    --primary-color: #007bff; /* Blue for buttons/links (ACR-inspired) */
+    --secondary-color: #6c757d; /* Gray for text */
+    --background-color: #f8f9fa; /* Light bg */
+    --error-color: #dc3545; /* Red for warnings */
+    --success-color: #28a745; /* Green for recommendations */
+    --font-family: 'Arial', sans-serif;
+    --font-size-base: 16px;
+    --padding-base: 1rem;
+    --border-radius: 0.25rem;
+}
+
+body {
+    font-family: var(--font-family);
+    font-size: var(--font-size-base);
+    background-color: var(--background-color);
+    color: var(--secondary-color);
+    margin: 0;
+    padding: var(--padding-base);
+    line-height: 1.5;
+}
+
+/* Form container */
+.form-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: var(--padding-base);
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: var(--border-radius);
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+/* Inputs and labels */
+label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: bold;
+}
+
+input[type="text"],
+input[type="number"],
+select {
+    width: 100%;
+    padding: 0.5rem;
+    margin-bottom: var(--padding-base);
+    border: 1px solid #ced4da;
+    border-radius: var(--border-radius);
+    font-size: var(--font-size-base);
+}
+
+input:focus,
+select:focus {
+    border-color: var(--primary-color);
+    outline: none;
+}
+
+/* Buttons */
+.button {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    font-size: var(--font-size-base);
+    transition: background-color 0.3s;
+}
+
+.button:hover {
+    background-color: darken(var(--primary-color), 10%);
+}
+
+/* Results output */
+.result {
+    margin-top: var(--padding-base);
+    padding: var(--padding-base);
+    border: 1px solid #ced4da;
+    border-radius: var(--border-radius);
+    background: #e9ecef;
+}
+
+.result.warning {
+    border-color: var(--error-color);
+    background: #f8d7da;
+}
+
+.result.success {
+    border-color: var(--success-color);
+    background: #d4edda;
+}
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+    .form-container {
+        padding: 0.5rem;
+    }
+}
